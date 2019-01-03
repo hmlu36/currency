@@ -1,0 +1,179 @@
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+    <title>近日匯率</title>
+
+
+    <style type="text/css">
+        .container {
+            box-sizing: border-box;
+            width: 80%;
+            height: 400px;
+            padding: 20px 15px 15px 15px;
+            margin: 15px auto 30px auto;
+            border: 1px solid #ddd;
+            background: #DDEEFE;
+            background: linear-gradient(#F3F3F3 0, #DDEEFE 50px);
+            background: -o-linear-gradient(#F3F3F3 0, #DDEEFE 50px);
+            background: -ms-linear-gradient(#F3F3F3 0, #DDEEFE 50px);
+            background: -moz-linear-gradient(#F3F3F3 0, #DDEEFE 50px);
+            background: -webkit-linear-gradient(#F3F3F3 0, #DDEEFE 50px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+            -o-box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            -ms-box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            -moz-box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            -webkit-box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .placeholder {
+            width: 100%;
+            height: 300px;
+            font-size: 14px;
+            line-height: 1.2em;
+            float: left;
+        }
+    </style>
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/0.8.9/jquery.csv.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jquery.flot@0.8.3/jquery.flot.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.symbol.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.time.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/excanvas.min.js"></script>
+</head>
+
+<body>
+
+
+    <div class="container">
+        <div id="placeholder" class="placeholder"></div>
+    </div>
+
+    <script>
+        var url = 'http://www.taifex.com.tw/data_gov/taifex_open_data.asp?data_name=DailyForeignExchangeRates';
+        $.ajaxSetup({
+            'beforeSend': function (xhr) {
+                xhr.overrideMimeType('text/html; charset=Big5');
+            },
+        });
+        $.get(url, function (data) {
+            //console.log(data);
+            var dataset = formatData($.csv.toObjects(data));
+            plotData(dataset);
+        });
+
+        function formatData(data) {
+            //            console.log(JSON.stringify(data));
+            var dataset = [];
+
+            var usDatas = [];
+            var cnDatas = [];
+            data.forEach(function (entry) {
+                var usData = [];
+                usData.push(stringToDate(entry["日期"], 'yyyy/MM/dd', '/'));
+                usData.push(entry["美元／新台幣"]);
+                usDatas.push(usData);
+
+                var cnData = [];
+                cnData.push(stringToDate(entry["日期"], 'yyyy/MM/dd', '/'));
+                cnData.push(entry["人民幣／新台幣"]);
+                cnDatas.push(cnData);
+            });
+
+            dataset[0] = {
+                label: "美元／新台幣",
+                data: usDatas
+            };
+
+            dataset[1] = {
+                label: "人民幣／新台幣",
+                data: cnDatas
+            };
+            return dataset;
+        }
+
+        function plotData(dataset) {
+            var options = {
+                series: {
+                    lines: {
+                        show: true,
+                        lineWidth: 1
+                    },
+                    shadowSize: 0
+                },
+                canvas: true,
+                xaxes: [{
+                    mode: "time"
+                }],
+                yaxis: {
+                    min: 0,
+                    max: 40
+                },
+                legend: {
+                    show: true
+                },
+                points: {
+                    show: true
+                },
+                grid: {
+                    clickable: true, hoverable: true
+                }
+            };
+            //console.log(JSON.stringify(dataset));
+            $.plot("#placeholder", dataset, options);
+        }
+
+        // 提示 tooltip
+
+        $("<div id='tooltip'></div>").css({
+            position: "absolute",
+            display: "none",
+            border: "1px solid #fdd",
+            padding: "2px",
+            "background-color": "#fee",
+            opacity: 0.80
+        }).appendTo("body");
+
+
+        $("#placeholder").bind("plothover", function (event, pos, item) {
+            if (item) {
+                var x = new Date(item.datapoint[0]),
+                    y = item.datapoint[1].toFixed(2);
+
+                $("#tooltip").html(item.series.label + " <br/> " + x.yyyymmdd() + " " + y)
+                    .css({ top: item.pageY + 5, left: item.pageX + 5 })
+                    .fadeIn(200);
+            } else {
+                $("#tooltip").hide();
+            }
+        });
+
+
+        function stringToDate(_date, _format, _delimiter) {
+            var formatLowerCase = _format.toLowerCase();
+            var formatItems = formatLowerCase.split(_delimiter);
+            var dateItems = _date.split(_delimiter);
+            var monthIndex = formatItems.indexOf("mm");
+            var dayIndex = formatItems.indexOf("dd");
+            var yearIndex = formatItems.indexOf("yyyy");
+            var month = parseInt(dateItems[monthIndex]);
+            month -= 1;
+            var formatedDate = new Date(dateItems[yearIndex], month, dateItems[dayIndex]);
+            return formatedDate;
+        }
+
+        Date.prototype.yyyymmdd = function () {
+            var mm = this.getMonth() + 1; // getMonth() is zero-based
+            var dd = this.getDate();
+
+            return [this.getFullYear(),
+            (mm > 9 ? '' : '0') + mm,
+            (dd > 9 ? '' : '0') + dd
+            ].join('');
+        };
+    </script>
+</body>
+
+</html>
